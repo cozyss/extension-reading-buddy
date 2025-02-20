@@ -29,9 +29,20 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+// Store the active port connection from the side panel
+let activePanelPort = null;
+
 // Handle connection from popup
 chrome.runtime.onConnect.addListener((port) => {
   console.log('Popup connected');
+  
+  // Store the active port if it's from the side panel
+  if (port.name === 'translator-port') {
+    activePanelPort = port;
+    port.onDisconnect.addListener(() => {
+      activePanelPort = null;
+    });
+  }
   
   // Send initial API key status
   sendApiKeyStatus(port);
@@ -48,6 +59,16 @@ chrome.runtime.onConnect.addListener((port) => {
         break;
     }
   });
+});
+
+// Handle messages from content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'textSelected' && activePanelPort) {
+    activePanelPort.postMessage({
+      type: 'selectedText',
+      text: message.text
+    });
+  }
 });
 
 // Helper Functions

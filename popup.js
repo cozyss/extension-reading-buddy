@@ -94,6 +94,11 @@ function connectToBackground() {
         case 'error':
           showStatus(message.error || 'Unknown error occurred', false);
           break;
+
+        case 'selectedText':
+          console.log('Received selected text:', message.text);
+          document.getElementById('inputText').value = message.text;
+          break;
       }
     });
     
