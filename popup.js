@@ -42,8 +42,8 @@ function displayTranslation(content, timestamp = null) {
   // Set the content, ensuring proper line breaks
   const formattedContent = content
     .replace(/\n/g, '<br>')
-    .replace(/●/g, '<br>●')
-    .replace(/\*/g, '•');
+    .replace(/[●•]/g, '•') // Normalize bullet points to a single type
+    .replace(/•/g, '<br>•'); // Add line break before bullet points
   
   translationContent.innerHTML = formattedContent;
   
@@ -67,9 +67,18 @@ function updateApiStatus(hasKey) {
 
 // Connection management
 let port = null;
+let connectionCheckInterval = null;
 
 function connectToBackground() {
   try {
+    if (port) {
+      try {
+        port.disconnect();
+      } catch (e) {
+        console.warn('Error disconnecting existing port:', e);
+      }
+    }
+
     port = chrome.runtime.connect({ name: 'translator-port' });
     
     port.onMessage.addListener((message) => {
@@ -103,12 +112,27 @@ function connectToBackground() {
     });
     
     port.onDisconnect.addListener(() => {
+      console.log('Port disconnected, attempting to reconnect...');
       port = null;
+      // Try to reconnect after a short delay
+      setTimeout(connectToBackground, 1000);
     });
+
+    // Set up connection health check
+    if (connectionCheckInterval) {
+      clearInterval(connectionCheckInterval);
+    }
+    connectionCheckInterval = setInterval(() => {
+      if (!port) {
+        console.log('Connection check failed, attempting to reconnect...');
+        connectToBackground();
+      }
+    }, 30000); // Check every 30 seconds
     
     return true;
   } catch (error) {
     console.error('Connection error:', error);
+    port = null;
     return false;
   }
 }
@@ -165,6 +189,9 @@ document.getElementById('updateApiKey').addEventListener('click', () => {
 
 // Cleanup on unload
 window.addEventListener('unload', () => {
+  if (connectionCheckInterval) {
+    clearInterval(connectionCheckInterval);
+  }
   if (port) {
     try {
       port.disconnect();

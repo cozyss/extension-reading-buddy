@@ -6,26 +6,13 @@ const CLAUDE_API = {
   MAX_TOKENS: 1024
 };
 
-const CONTEXT_MENU = {
-  id: "translateToChinese",
-  title: "Translate to Chinese",
-  contexts: ["selection"]
-};
-
-// Initialize extension
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create(CONTEXT_MENU);
-});
-
-// Handle extension icon click
-chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ windowId: tab.windowId });
-});
-
-// Handle context menu clicks
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === CONTEXT_MENU.id) {
-    handleContextMenuClick(info.selectionText, tab.id);
+// Handle messages from content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'textSelected' && activePanelPort) {
+    activePanelPort.postMessage({
+      type: 'selectedText',
+      text: message.text
+    });
   }
 });
 
@@ -61,32 +48,7 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
-// Handle messages from content script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'textSelected' && activePanelPort) {
-    activePanelPort.postMessage({
-      type: 'selectedText',
-      text: message.text
-    });
-  }
-});
-
 // Helper Functions
-async function handleContextMenuClick(selectedText, tabId) {
-  if (!selectedText) {
-    showNotification("Error", "No text selected");
-    return;
-  }
-
-  const data = await chrome.storage.local.get("apiKey");
-  if (!data.apiKey) {
-    showNotification("Error", "Please set your API key in the extension options");
-    return;
-  }
-
-  translateText(selectedText, data.apiKey, tabId);
-}
-
 async function handleTranslateRequest(text, port) {
   const data = await chrome.storage.local.get("apiKey");
   
@@ -130,14 +92,6 @@ async function handleApiKeyUpdate(apiKey, port) {
   port.postMessage({
     type: 'apiKeyStatus',
     hasKey: true
-  });
-}
-
-async function sendApiKeyStatus(port) {
-  const data = await chrome.storage.local.get("apiKey");
-  port.postMessage({
-    type: 'apiKeyStatus',
-    hasKey: !!data.apiKey
   });
 }
 
@@ -185,7 +139,7 @@ async function translateTextWithResult(text, apiKey, port) {
 
 - Complex vocabulary or idioms
 - Literary devices (metaphors, imagery)
-- Advanced grammatical
+- Advanced grammatical structures
 - Cultural context or multiple meanings
 - Unusual sentence patterns
 
