@@ -31,7 +31,7 @@ function displayTranslation(content, timestamp = null) {
     return;
   }
   
-  if (!content) {
+  if (content === undefined || content === null) {
     console.error('No content to display');
     return;
   }
@@ -39,13 +39,20 @@ function displayTranslation(content, timestamp = null) {
   // Show the container
   translationResult.style.display = 'block';
   
-  // Set the content
-  translationContent.innerHTML = content.replace(/\n/g, '<br>');
+  // Set the content, ensuring proper line breaks
+  const formattedContent = content
+    .replace(/\n/g, '<br>')
+    .replace(/●/g, '<br>●')
+    .replace(/\*/g, '•');
+  
+  translationContent.innerHTML = formattedContent;
   
   // Update timestamp if provided
   if (timestamp) {
     timestampElement.textContent = `Translated at: ${timestamp}`;
     timestampElement.style.display = 'block';
+  } else {
+    timestampElement.style.display = 'none';
   }
 }
 
@@ -71,6 +78,11 @@ function connectToBackground() {
       switch (message.type) {
         case 'apiKeyStatus':
           updateApiStatus(message.hasKey);
+          break;
+          
+        case 'partial':
+          console.log('Received partial translation:', message.result);
+          displayTranslation(message.result);
           break;
           
         case 'complete':

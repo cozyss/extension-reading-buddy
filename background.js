@@ -74,7 +74,7 @@ async function handleTranslateRequest(text, port) {
   
   try {
     console.log('Starting translation...');
-    const result = await translateTextWithResult(text, data.apiKey);
+    const result = await translateTextWithResult(text, data.apiKey, port);
     console.log('Translation completed:', result);
     
     const timestamp = new Date().toLocaleString();
@@ -139,7 +139,7 @@ function showNotification(title, message) {
 }
 
 // Translation Function
-async function translateTextWithResult(text, apiKey) {
+async function translateTextWithResult(text, apiKey, port) {
   try {
     const response = await fetch(CLAUDE_API.URL, {
       method: "POST",
@@ -159,7 +159,7 @@ async function translateTextWithResult(text, apiKey) {
 
 - Complex vocabulary or idioms
 - Literary devices (metaphors, imagery)
-- Advanced grammatical structures
+- Advanced grammatical
 - Cultural context or multiple meanings
 - Unusual sentence patterns
 
@@ -187,6 +187,7 @@ The text to analyze is: "${text}"`
 
     const reader = response.body.getReader();
     let fullText = '';
+    let buffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -195,38 +196,55 @@ The text to analyze is: "${text}"`
       
       // Convert the chunk to text
       const chunk = new TextDecoder().decode(value);
+      buffer += chunk;
       
-      // Parse the SSE messages
-      const messages = chunk.split('\n\n');
+      // Process complete messages from the buffer
+      let messages = buffer.split('\n\n');
+      buffer = messages.pop() || ''; // Keep the last incomplete message in the buffer
       
       for (const message of messages) {
         if (!message.trim()) continue;
         
-        // Parse the event and data
+        // Parse the event data
         const lines = message.split('\n');
-        let event = '';
-        let data = '';
+        let eventData = '';
         
         for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            event = line.slice(7).trim();
-          } else if (line.startsWith('data: ')) {
-            data = line.slice(6).trim();
+          if (line.startsWith('data: ')) {
+            eventData = line.slice(6);
+            break;
           }
         }
         
-        if (data) {
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.delta?.text) {
-              fullText += parsed.delta.text;
+        if (!eventData || eventData === '[DONE]') continue;
+        
+        try {
+          const parsed = JSON.parse(eventData);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            fullText += parsed.delta.text;
+            
+            // Send the partial result through the port
+            if (port) {
+              port.postMessage({
+                type: 'partial',
+                result: fullText
+              });
             }
-          } catch (e) {
-            console.error('Error parsing SSE data:', e);
           }
+        } catch (e) {
+          console.error('Error parsing SSE message:', e);
+          console.error('Message:', eventData);
         }
       }
     }
+
+    // Store and return the final result
+    const timestamp = new Date().toLocaleString();
+    await chrome.storage.local.set({
+      selectedText: text,
+      translationResult: fullText,
+      translationTimestamp: timestamp
+    });
 
     return fullText;
   } catch (error) {
