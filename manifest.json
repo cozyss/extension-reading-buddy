@@ -1,10 +1,22 @@
 {
-  "name": "Hello Extensions",
-  "description": "Base Level Extension",
+  "name": "Hello Extensions - Text Translator",
+  "description": "Translate selected text to Chinese using Claude API",
   "version": "1.0",
   "manifest_version": 3,
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://api.anthropic.com/*"
+  ],
   "action": {
-    "default_popup": "hello.html",
-    "default_icon": "hello_extensions.png"
+    "default_icon": "logo.png",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
   }
 }
