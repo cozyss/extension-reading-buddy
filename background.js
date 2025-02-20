@@ -17,6 +17,11 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create(CONTEXT_MENU);
 });
 
+// Handle extension icon click
+chrome.action.onClicked.addListener((tab) => {
+  chrome.sidePanel.open({ windowId: tab.windowId });
+});
+
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === CONTEXT_MENU.id) {

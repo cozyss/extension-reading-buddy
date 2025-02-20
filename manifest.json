@@ -6,17 +6,21 @@
   "permissions": [
     "contextMenus",
     "storage",
-    "notifications"
+    "notifications",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://api.anthropic.com/*"
   ],
   "action": {
     "default_icon": "logo.png",
-    "default_popup": "popup.html"
+    "default_title": "Text Translator"
   },
   "options_page": "options.html",
   "background": {
     "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
   }
 }
