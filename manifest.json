@@ -1,6 +1,6 @@
 {
-  "name": "Hello Extensions - Text Translator",
-  "description": "Translate selected text to Chinese using Claude API",
+  "name": "Reading Buddy",
+  "description": "Your friendly companion that helps you understand English texts better by revealing hidden meanings, cultural references, and beautiful writing techniques",
   "version": "1.0",
   "manifest_version": 3,
   "permissions": [
@@ -15,7 +15,7 @@
   ],
   "action": {
     "default_icon": "logo.png",
-    "default_title": "Text Translator"
+    "default_title": "Reading Buddy"
   },
   "options_page": "options.html",
   "background": {
