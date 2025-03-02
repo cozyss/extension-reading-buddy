@@ -58,6 +58,7 @@ function displayTranslation(content, timestamp = null) {
 
 // Function to update API status display
 function updateApiStatus(hasKey) {
+  console.log('Updating API status:', hasKey);
   const indicator = document.getElementById('apiStatusIndicator');
   const statusText = document.getElementById('apiStatusText');
   
@@ -70,6 +71,7 @@ let port = null;
 let connectionCheckInterval = null;
 
 function connectToBackground() {
+  console.log('Connecting to background script...');
   try {
     if (port) {
       try {
@@ -80,9 +82,10 @@ function connectToBackground() {
     }
 
     port = chrome.runtime.connect({ name: 'translator-port' });
+    console.log('Connected to background script');
     
     port.onMessage.addListener((message) => {
-      console.log('Received message:', message);
+      console.log('Popup received message:', message);
       
       switch (message.type) {
         case 'apiKeyStatus':
@@ -139,18 +142,50 @@ function connectToBackground() {
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('Popup DOM loaded, initializing...');
+  
+  // Try to connect to background script
   if (!connectToBackground()) {
     showStatus('Failed to establish connection', false);
     return;
   }
-
+  
+  // Check API key status directly
+  checkApiKeyStatus();
+  
   // Load previous translation
   chrome.storage.local.get(['translationResult', 'translationTimestamp'], (data) => {
+    console.log('Loaded previous translation data:', data);
     if (data.translationResult) {
       displayTranslation(data.translationResult, data.translationTimestamp);
     }
   });
+  
+  // Also load any previously selected text
+  chrome.storage.local.get(['selectedText'], (data) => {
+    console.log('Loaded previously selected text:', data);
+    if (data.selectedText) {
+      document.getElementById('inputText').value = data.selectedText;
+    }
+  });
+  
+  // Listen for runtime messages (like API key updates)
+  chrome.runtime.onMessage.addListener((message) => {
+    console.log('Popup received runtime message:', message);
+    
+    if (message.type === 'apiKeyStatus') {
+      updateApiStatus(message.hasKey);
+    }
+  });
 });
+
+// Function to check API key status directly from storage
+function checkApiKeyStatus() {
+  chrome.storage.local.get('apiKey', (data) => {
+    console.log('Checking API key status directly from storage');
+    updateApiStatus(!!data.apiKey);
+  });
+}
 
 // Handle translation button click
 document.getElementById('translateButton').addEventListener('click', () => {
@@ -166,20 +201,29 @@ document.getElementById('translateButton').addEventListener('click', () => {
     return;
   }
 
-  // Clear previous translation
-  document.getElementById('translationContent').innerHTML = '';
-  document.getElementById('timestamp').style.display = 'none';
-  
-  showStatus('Translating...', true, true);
-  
-  try {
-    port.postMessage({
-      action: 'translateText',
-      text: inputText
-    });
-  } catch (error) {
-    showStatus('Failed to start translation. Please try again.', false);
-  }
+  // Check if API key is configured
+  chrome.storage.local.get('apiKey', (data) => {
+    if (!data.apiKey) {
+      showStatus('API key not configured. Please update your API key.', false);
+      return;
+    }
+    
+    // Clear previous translation
+    document.getElementById('translationContent').innerHTML = '';
+    document.getElementById('timestamp').style.display = 'none';
+    
+    showStatus('Translating...', true, true);
+    
+    try {
+      port.postMessage({
+        action: 'translateText',
+        text: inputText
+      });
+    } catch (error) {
+      console.error('Error sending translation request:', error);
+      showStatus('Failed to start translation. Please try again.', false);
+    }
+  });
 });
 
 // Handle "Update API Key" click

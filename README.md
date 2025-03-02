@@ -5,7 +5,7 @@ Reading Buddy is your friendly Chrome extension that helps you better understand
 ## What Can Reading Buddy Do?
 
 - Sits quietly in your browser until you need help
-- Just highlight any text and right-click to get instant help
+- Just highlight any text to analyze it
 - Explains tricky words and phrases in a friendly way
 - Points out interesting writing techniques
 - Helps you understand cultural references
@@ -15,16 +15,17 @@ Reading Buddy is your friendly Chrome extension that helps you better understand
 ## Getting Started
 
 1. Install Reading Buddy in Chrome
-2. Click the Reading Buddy icon in your toolbar and choose "Settings"
+2. Click the Reading Buddy icon in your toolbar to open the side panel
 3. Connect it to Claude AI by adding your API key
 4. You're all set!
 
 ## How to Use Your Reading Buddy
 
-1. Find some interesting English text you'd like to understand better
-2. Select the text with your mouse
-3. Right-click and choose "Explore Text"
-4. Your Reading Buddy will show you what makes this text special!
+1. Click the Reading Buddy icon to open the side panel
+2. Find some interesting English text you'd like to understand better
+3. Select the text with your mouse
+4. The text will automatically appear in Reading Buddy
+5. Click "Explore Text" to see what makes this text special!
 
 ## Need Help?
 

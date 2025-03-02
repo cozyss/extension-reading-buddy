@@ -7,7 +7,8 @@
     "storage",
     "notifications",
     "sidePanel",
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "https://api.anthropic.com/*"
@@ -26,5 +27,6 @@
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": ["content.js"]
-  }]
+  }],
+  "privacy_policy_url": "privacy-policy.html"
 }

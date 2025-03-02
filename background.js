@@ -6,49 +6,128 @@ const CLAUDE_API = {
   MAX_TOKENS: 1024
 };
 
-// Handle messages from content script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'textSelected' && activePanelPort) {
-    activePanelPort.postMessage({
-      type: 'selectedText',
-      text: message.text
-    });
-  }
+// Log that background script has loaded
+console.log('Reading Buddy background script loaded');
+
+// Handle extension icon click
+chrome.action.onClicked.addListener((tab) => {
+  console.log('Extension icon clicked, opening side panel');
+  chrome.sidePanel.open({ windowId: tab.windowId });
 });
 
 // Store the active port connection from the side panel
 let activePanelPort = null;
 
-// Handle connection from popup
+// Handle messages from content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('Background received message:', message);
+  
+  if (message.action === 'textSelected') {
+    console.log('Text selected:', message.text);
+    console.log('Active panel port exists:', !!activePanelPort);
+    
+    if (activePanelPort) {
+      try {
+        activePanelPort.postMessage({
+          type: 'selectedText',
+          text: message.text
+        });
+        console.log('Sent selected text to panel');
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('Error sending to panel:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    } else {
+      console.warn('No active panel port to send selected text to');
+      sendResponse({ success: false, error: 'No active panel' });
+    }
+  } else if (message.action === 'updateApiKey') {
+    console.log('Received API key update via runtime message');
+    handleApiKeyUpdate(message.apiKey, { 
+      postMessage: (msg) => {
+        try {
+          // Try to send a response back to the sender
+          sendResponse(msg);
+        } catch (error) {
+          console.error('Error sending response to API key update:', error);
+        }
+      }
+    });
+    // Return true to indicate we'll respond asynchronously
+    return true;
+  }
+  
+  // Return true to indicate we'll respond asynchronously
+  return true;
+});
+
+// Handle connection from popup or content script
 chrome.runtime.onConnect.addListener((port) => {
-  console.log('Popup connected');
+  console.log('Connection established with:', port.name);
   
   // Store the active port if it's from the side panel
   if (port.name === 'translator-port') {
     activePanelPort = port;
+    console.log('Stored active panel port');
+    
+    // Send initial API key status
+    sendApiKeyStatus(port);
+    
     port.onDisconnect.addListener(() => {
-      activePanelPort = null;
+      console.log('Panel port disconnected');
+      if (activePanelPort === port) {
+        activePanelPort = null;
+      }
+    });
+    
+    port.onMessage.addListener(async (request) => {
+      console.log('Received request from panel:', request);
+      
+      switch (request.action) {
+        case "translateText":
+          await handleTranslateRequest(request.text, port);
+          break;
+        case "updateApiKey":
+          await handleApiKeyUpdate(request.apiKey, port);
+          break;
+      }
+    });
+  } else if (port.name === 'options-port') {
+    console.log('Options page connected');
+    
+    port.onMessage.addListener(async (request) => {
+      console.log('Received request from options page:', request);
+      
+      if (request.action === 'updateApiKey') {
+        await handleApiKeyUpdate(request.apiKey, port);
+        
+        // Also notify the side panel if it's connected
+        if (activePanelPort) {
+          activePanelPort.postMessage({
+            type: 'apiKeyStatus',
+            hasKey: true
+          });
+        }
+      }
     });
   }
-  
-  // Send initial API key status
-  sendApiKeyStatus(port);
-
-  port.onMessage.addListener(async (request) => {
-    console.log('Received request:', request);
-    
-    switch (request.action) {
-      case "translateText":
-        await handleTranslateRequest(request.text, port);
-        break;
-      case "updateApiKey":
-        await handleApiKeyUpdate(request.apiKey, port);
-        break;
-    }
-  });
 });
 
 // Helper Functions
+async function sendApiKeyStatus(port) {
+  try {
+    const data = await chrome.storage.local.get("apiKey");
+    port.postMessage({
+      type: 'apiKeyStatus',
+      hasKey: !!data.apiKey
+    });
+    console.log('Sent API key status:', !!data.apiKey);
+  } catch (error) {
+    console.error('Error sending API key status:', error);
+  }
+}
+
 async function handleTranslateRequest(text, port) {
   const data = await chrome.storage.local.get("apiKey");
   
@@ -88,11 +167,43 @@ async function handleTranslateRequest(text, port) {
 }
 
 async function handleApiKeyUpdate(apiKey, port) {
+  console.log('Updating API key in storage');
   await chrome.storage.local.set({ apiKey });
-  port.postMessage({
-    type: 'apiKeyStatus',
-    hasKey: true
-  });
+  
+  // Notify the port that sent the update
+  try {
+    port.postMessage({
+      type: 'apiKeyStatus',
+      hasKey: true
+    });
+    console.log('Notified sender about API key update');
+  } catch (error) {
+    console.error('Error notifying sender about API key update:', error);
+  }
+  
+  // Also notify the side panel if it's connected and different from the sender
+  if (activePanelPort && activePanelPort !== port) {
+    try {
+      activePanelPort.postMessage({
+        type: 'apiKeyStatus',
+        hasKey: true
+      });
+      console.log('Notified side panel about API key update');
+    } catch (error) {
+      console.error('Error notifying side panel about API key update:', error);
+    }
+  }
+  
+  // Broadcast to all runtime listeners as well
+  try {
+    chrome.runtime.sendMessage({
+      type: 'apiKeyStatus',
+      hasKey: true
+    });
+    console.log('Broadcast API key update to all listeners');
+  } catch (error) {
+    console.error('Error broadcasting API key update:', error);
+  }
 }
 
 function handleTranslationError(error, port) {
@@ -121,6 +232,13 @@ function showNotification(title, message) {
 // Translation Function
 async function translateTextWithResult(text, apiKey, port) {
   try {
+    console.log('Starting API request with:', { 
+      url: CLAUDE_API.URL, 
+      version: CLAUDE_API.VERSION, 
+      model: CLAUDE_API.MODEL,
+      textLength: text.length
+    });
+    
     const response = await fetch(CLAUDE_API.URL, {
       method: "POST",
       headers: {
@@ -162,17 +280,23 @@ The text to analyze is: "${text}"`
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      console.error('API response not OK:', response.status, response.statusText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${response.statusText}`);
     }
 
+    console.log('API response received, starting to read stream');
     const reader = response.body.getReader();
     let fullText = '';
     let buffer = '';
+    let messageCount = 0;
 
     while (true) {
       const { done, value } = await reader.read();
       
-      if (done) break;
+      if (done) {
+        console.log('Stream reading complete');
+        break;
+      }
       
       // Convert the chunk to text
       const chunk = new TextDecoder().decode(value);
@@ -184,6 +308,7 @@ The text to analyze is: "${text}"`
       
       for (const message of messages) {
         if (!message.trim()) continue;
+        messageCount++;
         
         // Parse the event data
         const lines = message.split('\n');
@@ -218,6 +343,13 @@ The text to analyze is: "${text}"`
       }
     }
 
+    console.log('Translation complete, processed messages:', messageCount);
+    
+    if (!fullText) {
+      console.error('No text was generated from the API');
+      throw new Error('No text was generated from the API');
+    }
+
     // Store and return the final result
     const timestamp = new Date().toLocaleString();
     await chrome.storage.local.set({
@@ -228,7 +360,16 @@ The text to analyze is: "${text}"`
 
     return fullText;
   } catch (error) {
-    console.error('Translation error:', error);
-    throw error;
+    console.error('Translation error details:', error);
+    // Add more context to the error
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Network error: Could not connect to Claude API. Please check your internet connection.');
+    } else if (error.message.includes('401')) {
+      throw new Error('Authentication error: Your API key may be invalid or expired.');
+    } else if (error.message.includes('429')) {
+      throw new Error('Rate limit exceeded: Too many requests to Claude API. Please try again later.');
+    } else {
+      throw error;
+    }
   }
 }
