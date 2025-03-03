@@ -220,15 +220,6 @@ function handleTranslationError(error, port) {
   });
 }
 
-function showNotification(title, message) {
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'logo.png',
-    title,
-    message
-  });
-}
-
 // Translation Function
 async function translateTextWithResult(text, apiKey, port) {
   try {

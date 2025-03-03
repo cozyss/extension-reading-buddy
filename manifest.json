@@ -1,14 +1,11 @@
 {
   "name": "Reading Buddy",
-  "description": "Your friendly companion that helps you understand English texts better by revealing hidden meanings, cultural references, and beautiful writing techniques",
-  "version": "1.0",
+  "description": "Helps you understand English texts better by revealing cultural references and writing techniques",
+  "version": "1.1",
   "manifest_version": 3,
   "permissions": [
     "storage",
-    "notifications",
-    "sidePanel",
-    "activeTab",
-    "scripting"
+    "sidePanel"
   ],
   "host_permissions": [
     "https://api.anthropic.com/*"

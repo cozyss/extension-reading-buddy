@@ -22,6 +22,13 @@ All data collected by Reading Buddy is stored locally in your browser using Chro
 
 Your Claude API key is stored securely in your browser's local storage and is only used to authenticate requests to the Claude AI service.
 
+## Permissions
+
+Reading Buddy uses minimal permissions:
+- **Storage:** To save your API key and analysis results locally
+- **Side Panel:** To display the extension interface in Chrome's side panel
+- **Host Permission (api.anthropic.com):** To send selected text to Claude AI for analysis
+
 ## Third-Party Services
 
 Reading Buddy uses Anthropic's Claude AI to analyze the text you select. When you use our extension, the text you select is sent to Claude AI for processing. Please refer to [Anthropic's Privacy Policy](https://www.anthropic.com/privacy) for information on how they handle data.
