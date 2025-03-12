@@ -2,7 +2,7 @@
 const CLAUDE_API = {
   URL: "https://api.anthropic.com/v1/messages",
   VERSION: "2023-06-01",
-  MODEL: "claude-3-5-sonnet-20241022",
+  MODEL: "claude-3-7-sonnet-latest",
   MAX_TOKENS: 1024
 };
 
@@ -25,6 +25,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'textSelected') {
     console.log('Text selected:', message.text);
     console.log('Active panel port exists:', !!activePanelPort);
+    
+    // Store the selected text in local storage for later use
+    chrome.storage.local.set({ selectedText: message.text });
     
     if (activePanelPort) {
       try {
@@ -73,6 +76,17 @@ chrome.runtime.onConnect.addListener((port) => {
     
     // Send initial API key status
     sendApiKeyStatus(port);
+    
+    // Send any previously selected text to the newly connected popup
+    chrome.storage.local.get('selectedText', (data) => {
+      if (data.selectedText) {
+        console.log('Sending previously selected text to new panel:', data.selectedText);
+        port.postMessage({
+          type: 'selectedText',
+          text: data.selectedText
+        });
+      }
+    });
     
     port.onDisconnect.addListener(() => {
       console.log('Panel port disconnected');
@@ -254,7 +268,7 @@ async function translateTextWithResult(text, apiKey, port) {
 
 Try to keep the annotations concise and to the point. Format each annotation as:
 ● [English word/phrase/structure] - [Chinese translation]
-- [Detailed explanation in Chinese covering relevant aspects:
+[Detailed explanation in Chinese covering relevant aspects:
   * Usage and context
   * Grammar structure if complex
   * Literary effect if relevant

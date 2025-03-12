@@ -1,7 +1,12 @@
 {
-  "name": "Reading Buddy",
+  "name": "Lingo Guide",
   "description": "Helps you understand English texts better by revealing cultural references and writing techniques",
-  "version": "1.1",
+  "version": "1.2",
+   "icons": {
+    "16": "favicon.png",
+    "32": "favicon.png",
+    "64": "favicon.png"
+  },
   "manifest_version": 3,
   "permissions": [
     "storage",
@@ -11,8 +16,8 @@
     "https://api.anthropic.com/*"
   ],
   "action": {
-    "default_icon": "logo.png",
-    "default_title": "Reading Buddy"
+    "default_icon": "favicon.png",
+    "default_title": "Lingo Guide"
   },
   "options_page": "options.html",
   "background": {
@@ -24,6 +29,5 @@
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": ["content.js"]
-  }],
-  "privacy_policy_url": "privacy-policy.html"
+  }]
 }
