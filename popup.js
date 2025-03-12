@@ -67,11 +67,10 @@ function displayTranslation(content, timestamp = null) {
   // Detect if we're in the summary section (which comes after annotations)
   let inSummarySection = false;
   
+  // Process each line of content
   lines.forEach(line => {
-    if (!line.trim()) {
-      // Skip empty lines
-      return;
-    }
+    // Skip empty lines
+    if (!line.trim()) return;
     
     const trimmedLine = line.trim();
     
@@ -95,28 +94,92 @@ function displayTranslation(content, timestamp = null) {
     }
   });
   
-  // Apply basic formatting
-  processedContent = processedContent
+  // Apply formatting to make English phrases and Chinese translations bold
+  processedContent = formatAnnotations(processedContent);
+  
+  // Handle streaming updates more smoothly
+  updateContentWithScrollPreservation(translationContent, processedContent, content);
+  
+  // Update timestamp if provided
+  if (timestamp) {
+    timestampElement.textContent = `Generated at: ${timestamp}`;
+    timestampElement.style.display = 'block';
+  } else {
+    timestampElement.style.display = 'none';
+  }
+}
+
+// Helper function to format annotations with proper bold styling
+function formatAnnotations(content) {
+  // First handle any existing Markdown formatting
+  let formattedContent = content
     // Convert Markdown bold to HTML
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     // Convert Markdown italic to HTML
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
     // Remove square brackets around Chinese annotations
     .replace(/\[([^\[\]]+?)\]/g, '$1')
-    // Make original text bold - look for patterns like "Original: [text]" or "原文: [text]"
-    .replace(/(Original|原文|原始文本)(\s*[:：]\s*)([^<]+?)(<\/p>|<br>|$)/gi, '$1$2<strong>$3</strong>$4')
-    // Make translation part bold - look for patterns like "Translation: [text]" or "翻译: [text]"
-    .replace(/(Translation|翻译|译文)(\s*[:：]\s*)([^<]+?)(<\/p>|<br>|$)/gi, '$1$2<strong>$3</strong>$4');
+    // Remove quotation marks around text
+    .replace(/"([^"]+?)"/g, '$1')
+    .replace(/'([^']+?)'/g, '$1')
+    .replace(/「([^」]+?)」/g, '$1')
+    .replace(/『([^』]+?)』/g, '$1')
+    .replace(/[""]/g, '')
+    .replace(/['']/g, '');
   
-  // Handle streaming updates more smoothly
-  if (translationContent.innerHTML === '') {
+  // Format English-Chinese pairs in annotations
+  // This pattern looks for English text followed by a dash/hyphen and then Chinese text
+  formattedContent = formattedContent.replace(
+    /([A-Za-z][\w\s.,;!?()]+?)(\s*[-–—]\s*)([^\s<>][^<>]*?(?:[\u4e00-\u9fff]+)[^<>]*?)(<\/p>|<br>|$)/g, 
+    '<strong>$1</strong>$2<strong>$3</strong>$4'
+  );
+  
+  // Format labeled content patterns
+  const labelPatterns = [
+    // Original text patterns
+    {
+      label: /(Original|原文|原始文本)(\s*[:：]\s*)/gi,
+      content: /([^<]+?)(<\/p>|<br>|$)/
+    },
+    // Translation patterns
+    {
+      label: /(Translation|翻译|译文)(\s*[:：]\s*)/gi,
+      content: /([^<]+?)(<\/p>|<br>|$)/
+    },
+    // Example patterns
+    {
+      label: /(Example|例子|例句)(\s*[:：]\s*)/gi,
+      content: /([^<]+?)(<\/p>|<br>|$)/
+    }
+  ];
+  
+  // Apply formatting for each label pattern
+  labelPatterns.forEach(pattern => {
+    formattedContent = formattedContent.replace(
+      new RegExp(pattern.label.source + pattern.content.source, 'gi'),
+      '$1$2<strong>$3</strong>$4'
+    );
+  });
+  
+  // Additional pattern for bullet point annotations that contain English-Chinese pairs
+  // This looks for content after a bullet point that has both English and Chinese text
+  formattedContent = formattedContent.replace(
+    /<span class="bullet-point">•<\/span>\s*([A-Za-z][^<>]*?)(\s*[-–—]\s*)([^<>\s][^<>]*?(?:[\u4e00-\u9fff]+)[^<>]*?)(<\/p>|<br>|$)/g,
+    '<span class="bullet-point">•</span> <strong>$1</strong>$2<strong>$3</strong>$4'
+  );
+  
+  return formattedContent;
+}
+
+// Helper function to update content while preserving scroll position
+function updateContentWithScrollPreservation(contentElement, processedContent, rawContent) {
+  if (contentElement.innerHTML === '') {
     // First update - set the content directly
-    translationContent.innerHTML = processedContent;
-    translationContent.style.opacity = '1';
+    contentElement.innerHTML = processedContent;
+    contentElement.style.opacity = '1';
   } else {
-    // For streaming updates, use a more subtle approach to avoid flashing
-    // Only update if content has changed
-    if (translationContent.getAttribute('data-content') !== content) {
+    // For streaming updates, only update if content has changed
+    if (contentElement.getAttribute('data-content') !== rawContent) {
       // Store the scroll position
       const scrollContainer = document.querySelector('.results-container');
       const scrollPos = scrollContainer ? scrollContainer.scrollTop : 0;
@@ -124,10 +187,10 @@ function displayTranslation(content, timestamp = null) {
         (scrollContainer.scrollHeight - scrollContainer.scrollTop <= scrollContainer.clientHeight + 50) : false;
       
       // Update content without the fade effect for streaming updates
-      translationContent.innerHTML = processedContent;
+      contentElement.innerHTML = processedContent;
       
       // Store the current content for comparison in future updates
-      translationContent.setAttribute('data-content', content);
+      contentElement.setAttribute('data-content', rawContent);
       
       // Restore scroll position or keep scrolled to bottom if user was at bottom
       if (scrollContainer) {
@@ -138,14 +201,6 @@ function displayTranslation(content, timestamp = null) {
         }
       }
     }
-  }
-  
-  // Update timestamp if provided
-  if (timestamp) {
-    timestampElement.textContent = `Generated at: ${timestamp}`;
-    timestampElement.style.display = 'block';
-  } else {
-    timestampElement.style.display = 'none';
   }
 }
 
