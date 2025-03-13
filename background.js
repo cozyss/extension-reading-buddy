@@ -180,9 +180,40 @@ async function handleTranslateRequest(text, port) {
   }
 }
 
-async function handleApiKeyUpdate(apiKey, port) {
-  console.log('Updating API key in storage');
+// Function to reinitialize the extension after API key updates
+async function reinitializeExtension(apiKey, port) {
+  console.log('Reinitializing extension with new API key');
+  
+  // Store the new API key
   await chrome.storage.local.set({ apiKey });
+  
+  // Reset any active connections
+  if (activePanelPort) {
+    try {
+      // Notify the panel that we're reinitializing
+      activePanelPort.postMessage({
+        type: 'reinitializing',
+        message: 'Extension is reinitializing with new API key'
+      });
+    } catch (error) {
+      console.error('Error notifying panel about reinitialization:', error);
+    }
+  }
+  
+  // Clear any cached data that might depend on the old API key
+  await chrome.storage.local.remove(['translationResult', 'translationTimestamp', 'translationError']);
+  
+  // Broadcast to all runtime listeners that API key has been updated
+  try {
+    chrome.runtime.sendMessage({
+      type: 'apiKeyStatus',
+      hasKey: true,
+      reinitialized: true
+    });
+    console.log('Broadcast API key update and reinitialization to all listeners');
+  } catch (error) {
+    console.error('Error broadcasting API key update and reinitialization:', error);
+  }
   
   // Notify the port that sent the update
   try {
@@ -190,9 +221,15 @@ async function handleApiKeyUpdate(apiKey, port) {
       type: 'apiKeyStatus',
       hasKey: true
     });
-    console.log('Notified sender about API key update');
+    
+    // Also send a reinitialization complete message
+    port.postMessage({
+      type: 'reinitializationComplete'
+    });
+    
+    console.log('Notified sender about API key update and reinitialization completion');
   } catch (error) {
-    console.error('Error notifying sender about API key update:', error);
+    console.error('Error notifying sender about API key update and reinitialization:', error);
   }
   
   // Also notify the side panel if it's connected and different from the sender
@@ -200,23 +237,35 @@ async function handleApiKeyUpdate(apiKey, port) {
     try {
       activePanelPort.postMessage({
         type: 'apiKeyStatus',
-        hasKey: true
+        hasKey: true,
+        reinitialized: true
       });
-      console.log('Notified side panel about API key update');
+      console.log('Notified side panel about API key update and reinitialization');
     } catch (error) {
-      console.error('Error notifying side panel about API key update:', error);
+      console.error('Error notifying side panel about API key update and reinitialization:', error);
     }
   }
   
-  // Broadcast to all runtime listeners as well
-  try {
-    chrome.runtime.sendMessage({
-      type: 'apiKeyStatus',
-      hasKey: true
-    });
-    console.log('Broadcast API key update to all listeners');
-  } catch (error) {
-    console.error('Error broadcasting API key update:', error);
+  console.log('Extension reinitialization complete');
+  return true;
+}
+
+async function handleApiKeyUpdate(apiKey, port) {
+  console.log('Handling API key update');
+  
+  // Use the new reinitializeExtension function
+  const success = await reinitializeExtension(apiKey, port);
+  
+  if (!success) {
+    console.error('Failed to reinitialize extension');
+    try {
+      port.postMessage({
+        type: 'error',
+        error: 'Failed to reinitialize extension with new API key'
+      });
+    } catch (error) {
+      console.error('Error sending reinitialization failure message:', error);
+    }
   }
 }
 

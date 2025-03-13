@@ -238,6 +238,18 @@ function connectToBackground() {
       switch (message.type) {
         case 'apiKeyStatus':
           updateApiStatus(message.hasKey);
+          if (message.reinitialized) {
+            showStatus('Extension reinitialized with new API key', true);
+          }
+          break;
+          
+        case 'reinitializing':
+          console.log('Extension is reinitializing:', message.message);
+          showStatus('Extension is reinitializing with new API key...', true, true);
+          // Clear any existing translation results
+          document.getElementById('translationContent').innerHTML = '';
+          document.getElementById('translationResult').style.display = 'none';
+          document.getElementById('timestamp').style.display = 'none';
           break;
           
         case 'partial':
@@ -336,6 +348,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (message.type === 'apiKeyStatus') {
       updateApiStatus(message.hasKey);
+      if (message.reinitialized) {
+        showStatus('Extension reinitialized with new API key', true);
+        // Reconnect to background script to ensure we have a fresh connection
+        if (port) {
+          try {
+            port.disconnect();
+          } catch (e) {
+            console.warn('Error disconnecting existing port:', e);
+          }
+          port = null;
+        }
+        connectToBackground();
+      }
     }
   });
 });
